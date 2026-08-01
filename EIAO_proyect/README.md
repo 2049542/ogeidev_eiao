@@ -1,6 +1,6 @@
 # EIAO Backend — Sistema de Gestión Interna
 
-> Backend REST API para el sistema interno de la **Escuela Industrial Álvaro Obregón (EIAO)** de la **Universidad Autónoma de Nuevo León (UANL)**, Monterrey, N.L.
+> Backend + frontend del sistema interno de la **Escuela Industrial Álvaro Obregón (EIAO)** de la **Universidad Autónoma de Nuevo León (UANL)**, Monterrey, N.L.
 >
 > Desarrollado por **Diego** como proyecto de **Servicio Social**.
 
@@ -12,26 +12,38 @@ Este sistema centraliza la gestión interna de la EIAO en módulos especializado
 
 | Módulo | Descripción |
 |---|---|
-| **Autenticación** | Registro con @uanl.edu.mx, aprobación por Admin, JWT |
+| **Autenticación** | Registro con correo institucional, aprobación por Admin, JWT |
 | **Auditorio** | Reservaciones con flujo de aprobación |
-| **Becas** | Publicación de flyers con notificación masiva por correo |
+| **Avisos / Becas** | Publicación de flyers e infografías con "me gusta" |
 | **Seguridad / CCTV** | Solicitudes de grabación y reportes de incidentes |
 | **Mantenimiento** | Órdenes correctivas con historial de seguimiento |
-| **Inventario** | Catálogo de equipos y materiales |
+| **Inventario** | Registro detallado de equipo de cómputo |
 | **Centro de Ayuda** | Tickets internos y redirección a soporte UANL central |
 | **Tickets** | Sistema general de soporte técnico (CCTV, AV, etc.) |
 | **Usuarios** | Gestión de cuentas y roles (solo Admin) |
 
 ---
 
+## Stack tecnológico
+
+- **Runtime:** Node.js >= 18 (Express 4)
+- **ORM:** Prisma 5 + PostgreSQL (Supabase)
+- **Auth:** JWT (access + refresh token) + bcrypt
+- **Correos:** Resend
+- **Imágenes:** Cloudinary v2
+- **Seguridad:** Helmet, CORS, express-rate-limit
+- **Frontend:** HTML/CSS/JS vanilla, sin build step ni framework — servido como estático desde el mismo proceso Express (`public/proyecto.html` + `public/ui.js`)
+
 ## Arquitectura
 
 ```
-eiao-backend/
+EIAO_proyect/
+├── api/
+│   └── index.js               # Punto de entrada serverless para Vercel (envuelve src/app.js)
 ├── src/
-│   ├── app.js                    # Servidor Express principal
-│   ├── routes/                   # Definición de endpoints por módulo
-│   ├── controllers/              # Lógica de negocio por módulo
+│   ├── app.js                 # Servidor Express principal
+│   ├── routes/                # Definición de endpoints por módulo
+│   ├── controllers/           # Lógica de negocio por módulo
 │   ├── middleware/
 │   │   ├── auth.middleware.js    # Verificación JWT
 │   │   ├── roles.middleware.js   # Control de acceso por rol (RBAC)
@@ -40,39 +52,26 @@ eiao-backend/
 │       ├── email.service.js      # Envío de correos con Resend
 │       └── cloudinary.service.js # Subida de imágenes a Cloudinary
 ├── prisma/
-│   ├── schema.prisma             # Modelos de base de datos
-│   └── seed.js                   # Datos iniciales para desarrollo
-├── .env.example                  # Plantilla de variables de entorno
+│   ├── schema.prisma           # Modelos de base de datos
+│   └── seed.js                 # Datos iniciales de desarrollo
+├── public/
+│   ├── proyecto.html           # Frontend (SPA vanilla)
+│   ├── ui.js                   # Lógica del frontend
+│   └── logoEIAO.png
+├── .env.example                 # Plantilla de variables de entorno
+├── vercel.json                  # Config de deploy en Vercel
 └── package.json
 ```
 
-**Stack tecnológico:**
-- **Runtime:** Node.js 24
-- **Framework:** Express.js 4
-- **ORM:** Prisma 5 + PostgreSQL (Supabase)
-- **Auth:** JWT + bcrypt
-- **Correos:** Resend
-- **Imágenes:** Cloudinary v2
-- **Seguridad:** Helmet, CORS, express-rate-limit
+Localmente, `src/app.js` levanta un servidor Express normal con `app.listen()`. En Vercel, `api/index.js` importa ese mismo `app` (sin `.listen()`) y lo expone como función serverless — es el mismo código de aplicación en ambos casos.
 
 ---
 
-## Requisitos Previos
+## Correr en local
 
-- Node.js >= 18.0.0 (recomendado: 24 LTS)
-- npm >= 9
-- Cuenta en [Supabase](https://supabase.com) (PostgreSQL gratuito)
-- Cuenta en [Resend](https://resend.com) (correos transaccionales)
-- Cuenta en [Cloudinary](https://cloudinary.com) (imágenes)
-
----
-
-## Instalación
-
-### 1. Clonar e instalar dependencias
+### 1. Instalar dependencias
 
 ```bash
-cd eiao-backend
 npm install
 ```
 
@@ -87,70 +86,78 @@ Edita `.env` con tus credenciales reales (ver sección [Variables de Entorno](#v
 ### 3. Configurar la base de datos
 
 ```bash
-# Generar el cliente Prisma
-npm run db:generate
-
-# Crear las tablas en Supabase
-npm run db:push
-
-# Cargar datos iniciales (admins, usuarios de prueba, etc.)
-npm run db:seed
+npm run db:push    # Aplica el schema de Prisma a Supabase
+npm run db:seed     # Carga datos iniciales (cuenta maestra, usuarios de prueba, inventario)
 ```
 
-### 4. Correr en desarrollo
+### 4. Levantar el servidor
 
 ```bash
-npm run dev
+npm run dev          # Con hot-reload (nodemon)
+# o
+npm start            # Modo producción local
 ```
 
-El servidor inicia en `http://localhost:3000`
+El servidor inicia en `http://localhost:3000`. Verifica que responde:
 
-Verifica que funciona:
 ```bash
 curl http://localhost:3000/api/health
 ```
 
+Y abre `http://localhost:3000` en el navegador para ver el frontend.
+
 ---
 
-## Variables de Entorno
+## Variables de entorno
 
 | Variable | Descripción | Dónde obtenerla |
 |---|---|---|
-| `PORT` | Puerto del servidor (default: 3000) | — |
-| `NODE_ENV` | `development` o `production` | — |
-| `DATABASE_URL` | Connection string de PostgreSQL | Supabase > Settings > Database > URI |
+| `DATABASE_URL` | Connection string de Supabase (pooler, puerto 6543) — usada en runtime por Prisma Client | Supabase > Settings > Database > Connection string > "Transaction" |
+| `DIRECT_URL` | Connection string directa (puerto 5432) — usada solo para `db push`/migraciones | Supabase > Settings > Database > Connection string > "Direct" |
 | `JWT_SECRET` | Clave secreta para firmar tokens de acceso | Generar con `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
-| `JWT_EXPIRES_IN` | Duración del token (default: `24h`) | — |
-| `JWT_REFRESH_SECRET` | Clave para refresh tokens | Igual que JWT_SECRET pero diferente valor |
-| `JWT_REFRESH_EXPIRES_IN` | Duración refresh token (default: `7d`) | — |
-| `FRONTEND_URL` | URL del frontend para CORS | Tu dominio o `http://localhost:5500` en dev |
-| `RESEND_API_KEY` | API Key de Resend | resend.com > API Keys |
-| `EMAIL_FROM` | Dirección remitente verificada | Resend > Domains |
-| `CLOUDINARY_CLOUD_NAME` | Nombre de tu cloud | Cloudinary > Dashboard |
+| `JWT_EXPIRES_IN` | Duración del access token (ej. `24h`) | — |
+| `JWT_REFRESH_SECRET` | Clave para refresh tokens (cookie httpOnly) | Igual que `JWT_SECRET` pero con valor distinto |
+| `JWT_REFRESH_EXPIRES_IN` | Duración del refresh token (ej. `7d`) | — |
+| `FRONTEND_URL` | Origen(es) permitido(s) por CORS, separados por coma | Tu dominio de producción / `http://localhost:5500` en dev |
+| `RESEND_API_KEY` | API Key de Resend para envío de correos | resend.com > API Keys |
+| `EMAIL_FROM` | Dirección remitente verificada en Resend | Resend > Domains |
+| `CLOUDINARY_CLOUD_NAME` | Nombre del cloud de Cloudinary | Cloudinary > Dashboard |
 | `CLOUDINARY_API_KEY` | API Key de Cloudinary | Cloudinary > Dashboard |
 | `CLOUDINARY_API_SECRET` | API Secret de Cloudinary | Cloudinary > Dashboard |
+| `PORT` | Puerto del servidor en local (default: `3000`) | Solo aplica en local; Vercel no lo usa |
+| `NODE_ENV` | `development` o `production` | — |
+
+El servidor valida al arrancar que existan `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY` y las 3 variables de Cloudinary — si falta alguna, no levanta (ver `src/app.js`).
 
 ---
 
-## Deploy en Render + Supabase
+## Deploy en Vercel
 
-### Base de datos (Supabase)
+El repo ya incluye un `vercel.json` configurado: expone `api/index.js` como función serverless para todas las rutas `/api/*` y sirve `public/` como estático (incluyendo el rewrite de `/` → `/proyecto.html`).
 
-1. Crea proyecto en [supabase.com](https://supabase.com)
-2. Ve a **Settings > Database > Connection string > URI**
-3. Copia la URL (formato: `postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres`)
-4. Úsala como `DATABASE_URL` en Render
+### Pasos
 
-### Servidor (Render)
+1. En el dashboard de Vercel, crea un nuevo proyecto e importa este repositorio.
+2. **Root Directory**: selecciona la carpeta `EIAO_proyect` (no la raíz del repo).
+3. **Framework Preset**: "Other" — no hay framework de frontend que detectar.
+4. Agrega en **Settings > Environment Variables** todas las variables listadas arriba, tanto para *Production* como para *Preview*.
+5. En `FRONTEND_URL`, usa el dominio final de Vercel (ej. `https://tu-proyecto.vercel.app`). El código también acepta automáticamente cualquier origen `*.vercel.app` como fallback (ver CORS abajo), así que los deploys de preview funcionan sin configuración extra.
+6. Al hacer deploy, el script `postinstall` corre `prisma generate` automáticamente — no necesitas configurar un build command manual.
+7. Si el schema de Prisma no está aún aplicado en la base de producción, corre `npm run db:push` apuntando a la `DATABASE_URL` de producción (Vercel no ejecuta esto automáticamente en cada deploy).
+8. Verifica el deploy visitando `https://tu-proyecto.vercel.app/api/health` y la raíz `/` (debe cargar `proyecto.html`).
 
-1. Conecta tu repositorio de GitHub a [render.com](https://render.com)
-2. Crea un **Web Service** con:
-   - **Build Command:** `npm install && npm run db:generate && npm run db:push`
-   - **Start Command:** `npm start`
-   - **Environment:** `Node`
-3. Agrega todas las variables de entorno del `.env.example`
-4. Cambia `NODE_ENV=production` y `FRONTEND_URL=https://tudominio.com`
-5. Deploy 🚀
+---
+
+## Notas sobre CORS y `FRONTEND_URL`
+
+La configuración de CORS vive en `src/app.js` y permite:
+
+- Cualquier origen listado en `FRONTEND_URL` (separados por coma si son varios).
+- `http://localhost:3000`, `http://localhost:5500` y `http://127.0.0.1:5500` para desarrollo local.
+- Peticiones sin header `Origin` (curl, Postman) o con `Origin: null` (abrir el HTML directo con `file://`).
+- Cualquier subdominio de `*.vercel.app` automáticamente, para que los deploy previews de Vercel funcionen sin tener que agregar cada URL a `FRONTEND_URL` manualmente.
+
+Si agregas un dominio propio (no `*.vercel.app`), debes incluirlo explícitamente en `FRONTEND_URL`.
 
 ---
 
@@ -160,155 +167,128 @@ curl http://localhost:3000/api/health
 
 | Método | Ruta | Body | Roles | Descripción |
 |---|---|---|---|---|
-| POST | `/api/auth/register` | `{nombre, email, password}` | Público | Registrar cuenta (queda pendiente) |
+| POST | `/api/auth/register` | `{nombre, email, password}` | Público | Registrar cuenta (queda pendiente de aprobación) |
 | POST | `/api/auth/login` | `{email, password}` | Público | Iniciar sesión → JWT |
 | GET | `/api/auth/me` | — | Todos | Datos del usuario actual |
 | POST | `/api/auth/logout` | — | Todos | Cerrar sesión |
-
-**Respuesta de login:**
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "usuario": { "id": "...", "nombre": "...", "email": "...", "rol": "USUARIO" }
-  }
-}
-```
 
 ### USUARIOS (solo Admin)
 
 | Método | Ruta | Body | Descripción |
 |---|---|---|---|
-| GET | `/api/usuarios` | — | Listar todos los usuarios. Query: `?pendiente=true`, `?rol=BECAS` |
+| GET | `/api/usuarios` | — | Listar usuarios. Query: `?pendiente=true`, `?rol=...` |
 | PATCH | `/api/usuarios/:id/aprobar` | — | Aprobar cuenta + correo de bienvenida |
-| PATCH | `/api/usuarios/:id/rol` | `{rol}` | Cambiar rol del usuario |
+| PATCH | `/api/usuarios/:id/rol` | `{roles}` | Cambiar rol(es) del usuario |
 | DELETE | `/api/usuarios/:id` | — | Desactivar cuenta (soft delete) |
-| POST | `/api/usuarios/invitar` | `{email}` | Enviar invitación por correo |
 
 ### TICKETS
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| GET | `/api/tickets` | — | Todos | Lista según rol (filtrado automático) |
-| POST | `/api/tickets` | `{titulo, descripcion, area, tipo, prioridad?, slaHoras?}` | Todos | Crear ticket |
-| GET | `/api/tickets/:id` | — | Todos | Detalle con comentarios |
-| PATCH | `/api/tickets/:id/status` | `{status, seguimiento?}` | Admin, Soporte, dueño | Cambiar estado |
-| POST | `/api/tickets/:id/comentarios` | `{texto}` | Todos | Agregar comentario |
-
-**Status válidos:** `ABIERTO`, `EN_PROGRESO`, `PENDIENTE`, `RESUELTO`, `CERRADO`
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| GET | `/api/tickets` | — | Lista según rol (filtrado automático) |
+| POST | `/api/tickets` | `{titulo, descripcion, area, tipo, prioridad?, slaHoras?}` | Crear ticket |
+| GET | `/api/tickets/:id` | — | Detalle con comentarios |
+| PATCH | `/api/tickets/:id/status` | `{status, seguimiento?}` | Cambiar estado |
+| POST | `/api/tickets/:id/comentarios` | `{texto}` | Agregar comentario |
 
 ### AUDITORIO
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| GET | `/api/auditorio/reservaciones` | — | Todos | Admin/Auditorio: todas. Demás: solo aprobadas |
-| POST | `/api/auditorio/reservaciones` | `{evento, fecha, horaInicio, horaFin, asistentes, equipo?, notas?}` | Todos | Crear solicitud (queda PENDIENTE) |
-| PATCH | `/api/auditorio/reservaciones/:id/aprobar` | — | Admin | Aprobar → aparece en calendario + correo |
-| PATCH | `/api/auditorio/reservaciones/:id/rechazar` | `{motivo?}` | Admin | Rechazar + correo con motivo |
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| GET | `/api/auditorio/reservaciones` | — | Admin/Auditorio ven todas; demás solo aprobadas |
+| POST | `/api/auditorio/reservaciones` | `{evento, fecha, horaInicio, horaFin, asistentes, equipo?, notas?}` | Crear solicitud (queda PENDIENTE) |
+| PATCH | `/api/auditorio/reservaciones/:id/aprobar` | — | Aprobar → aparece en calendario + correo |
+| PATCH | `/api/auditorio/reservaciones/:id/rechazar` | `{motivoRechazo?}` | Rechazar + correo con motivo |
 
-### BECAS
+### AVISOS / BECAS
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| GET | `/api/becas` | — | Todos | Listar publicaciones |
-| POST | `/api/becas` | `multipart/form-data: {titulo, descripcion, imagen}` | Admin, Becas | Publicar + subir imagen + notificar docentes |
-| DELETE | `/api/becas/:id` | — | Admin, Becas | Eliminar de BD y Cloudinary |
-
-**Nota:** El endpoint POST debe enviarse como `multipart/form-data` con el archivo en el campo `imagen`.
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| GET | `/api/becas` | — | Listar publicaciones |
+| POST | `/api/becas` | `multipart/form-data: {titulo, descripcion, imagen}` | Publicar + subir imagen a Cloudinary + notificar |
+| DELETE | `/api/becas/:id` | — | Eliminar de BD y Cloudinary |
 
 ### SEGURIDAD / CCTV
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| POST | `/api/seguridad/grabaciones` | `{motivo, zona, fecha, horaInicio, horaFin, descripcion?, personas?, urgencia?}` | Todos | Solicitar grabación + correo de confirmación |
-| GET | `/api/seguridad/grabaciones` | — | Todos | Admin/Soporte: todas. Demás: propias |
-| PATCH | `/api/seguridad/grabaciones/:id/status` | `{status}` | Admin, Soporte | Actualizar estado |
-| POST | `/api/seguridad/incidentes` | `{tipo, fecha, hora, lugar, descripcion, contacto?, anonimo?}` | Todos | Reportar incidente (puede ser anónimo) |
-| GET | `/api/seguridad/incidentes` | — | Todos | Admin: todos. Demás: propios |
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| POST | `/api/seguridad/grabaciones` | `{motivo, zona, fecha, horaInicio, horaFin, ...}` | Solicitar grabación + correo de confirmación |
+| GET | `/api/seguridad/grabaciones` | — | Admin/Soporte ven todas; demás solo propias |
+| PATCH | `/api/seguridad/grabaciones/:id/status` | `{status}` | Actualizar estado |
+| POST | `/api/seguridad/incidentes` | `{tipo, fecha, hora, lugar, descripcion, anonimo?}` | Reportar incidente (puede ser anónimo) |
+| GET | `/api/seguridad/incidentes` | — | Admin ve todos; demás solo propios |
 
 ### MANTENIMIENTO
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| GET | `/api/mantenimiento` | — | Todos | Listar órdenes |
-| POST | `/api/mantenimiento` | `{titulo, descripcion, ubicacion, prioridad?}` | Todos | Crear orden correctiva |
-| GET | `/api/mantenimiento/:id` | — | Todos | Detalle + historial completo |
-| PATCH | `/api/mantenimiento/:id/status` | `{status, comentario?, tecnicoId?}` | Admin, Mantenimiento | Actualizar estado + registra en historial |
-
-**Status válidos:** `PENDIENTE`, `EN_PROGRESO`, `COMPLETADO`, `CANCELADO`
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| GET | `/api/mantenimiento` | — | Listar órdenes |
+| POST | `/api/mantenimiento` | `{titulo, descripcion, ubicacion, prioridad?}` | Crear orden correctiva |
+| GET | `/api/mantenimiento/:id` | — | Detalle + historial completo |
+| PATCH | `/api/mantenimiento/:id/status` | `{status, comentario?, tecnicoId?}` | Actualizar estado + registra en historial |
 
 ### INVENTARIO
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| GET | `/api/inventario` | — | Todos | Listar inventario. Query: `?categoria=ELECTRONICO` |
-| POST | `/api/inventario` | `{nombre, categoria, cantidad?, cantidadTotal?, descripcion?, ubicacion?}` | Admin, Mantenimiento | Agregar ítem |
-| PATCH | `/api/inventario/:id` | Campos a actualizar | Admin, Mantenimiento | Actualizar ítem |
-| DELETE | `/api/inventario/:id` | — | Admin | Eliminar ítem |
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| GET | `/api/inventario` | — | Listar inventario |
+| POST | `/api/inventario` | Campos del equipo (departamento, tipoEquipo, etc.) | Agregar equipo |
+| PATCH | `/api/inventario/:id` | Campos a actualizar | Actualizar equipo |
+| DELETE | `/api/inventario/:id` | — | Eliminar registro |
 
 ### CENTRO DE AYUDA
 
-| Método | Ruta | Body | Roles | Descripción |
-|---|---|---|---|---|
-| GET | `/api/centroayuda/tickets` | — | Todos | Listar tickets de ayuda |
-| POST | `/api/centroayuda/tickets` | `{titulo, descripcion, tipo}` | Todos | Crear ticket. Si tipo es SIASE/NEXUS/TEAMS redirige a UANL central |
-| PATCH | `/api/centroayuda/tickets/:id/status` | `{status, seguimiento?}` | Admin, Centro de Ayuda | Resolver ticket + notificación correo |
-
-**Tipos internos:** `CONTRASENA_INTERNA`, `RED`, `EQUIPO_PLANTEL`, `OTRO`  
-**Tipos externos (→ centrodeayuda.uanl.mx):** `SIASE`, `NEXUS`, `TEAMS`, `CORREO_UANL`
+| Método | Ruta | Body | Descripción |
+|---|---|---|---|
+| GET | `/api/centroayuda/tickets` | — | Listar tickets de ayuda |
+| POST | `/api/centroayuda/tickets` | `{titulo, descripcion, tipo}` | Crear ticket |
+| PATCH | `/api/centroayuda/tickets/:id/status` | `{status, seguimiento?}` | Resolver ticket + notificación |
 
 ---
 
-## Modelos de Base de Datos
+## Modelos de base de datos
 
 | Modelo | Descripción |
 |---|---|
-| `User` | Usuarios del sistema con rol y estado de aprobación |
-| `Ticket` | Tickets de soporte técnico y centro de ayuda |
+| `User` | Usuarios del sistema con roles (array) y estado de aprobación |
+| `Ticket` | Tickets de soporte técnico |
 | `Comentario` | Historial de comentarios en tickets |
+| `EncuestaSatisfaccion` | Encuesta post-resolución de ticket |
 | `Reservacion` | Solicitudes de uso del auditorio |
-| `BecaPublicacion` | Flyers e infografías de becas |
+| `BecaPublicacion` | Avisos/flyers, con "me gusta" |
+| `AvisoLike` | Registro de "me gusta" por usuario |
 | `SolicitudGrabacion` | Solicitudes de grabación CCTV |
 | `ReporteIncidente` | Reportes de seguridad (pueden ser anónimos) |
-| `Inventario` | Catálogo de equipos y materiales |
+| `Inventario` | Registro detallado de equipo de cómputo |
 | `MantenimientoCorrectivo` | Órdenes de trabajo correctivo |
-| `HistorialMantenimiento` | Log de cambios de estado en órdenes |
+| `HistorialMantenimiento` | Log de cambios de estado en órdenes de mantenimiento |
+| `SolucionRapida` | Base de conocimiento de autoservicio |
 
 ---
 
-## Roles y Permisos
+## Roles del sistema
 
-| Rol | Módulos accesibles |
-|---|---|
-| `ADMINISTRADOR` | **Todo**. Aprueba cuentas, reservaciones y tiene acceso total |
-| `BECAS` | Publicar y eliminar becas + ver becas |
-| `SOPORTE_TECNICO` | Tickets de soporte técnico, solicitudes CCTV |
-| `AUDITORIO` | Ver todas las reservaciones del auditorio |
-| `MANTENIMIENTO` | Órdenes de mantenimiento + inventario (editar) |
-| `CENTRO_AYUDA` | Tickets de Centro de Ayuda |
-| `PRESTADOR_SERVICIO_SOCIAL` | Solo módulo de Auditorio (crear y ver aprobadas) |
-| `USUARIO` (Maestro) | Becas, Centro de Ayuda, Seguridad/CCTV, Auditorio, Inventario (lectura), Mantenimiento correctivo |
+Definidos en el enum `Rol` de `prisma/schema.prisma`: `Administrador`, `Avisos`, `SoporteTecnico`, `Auditorio`, `Mantenimiento`, `Tecnico`, `CentroDeAyuda`, `ServicioSocial`, `DocenteAdministrativo`. Un usuario puede tener más de un rol asignado.
 
 ---
 
-## Scripts Disponibles
+## Scripts disponibles
 
 ```bash
 npm run dev          # Servidor en desarrollo con hot-reload (nodemon)
-npm start            # Servidor en producción
-npm run db:generate  # Regenerar el cliente Prisma
-npm run db:push      # Aplicar cambios del schema a la BD (sin migraciones)
-npm run db:migrate   # Crear migración y aplicarla (para producción)
-npm run db:studio    # Abrir Prisma Studio (GUI de la BD)
-npm run db:seed      # Cargar datos iniciales de desarrollo
+npm start            # Servidor en modo producción (local)
+npm run build         # prisma generate (se corre también automático en postinstall)
+npm run db:push        # Aplicar el schema de Prisma a la base de datos (sin migraciones)
+npm run db:seed         # Cargar datos iniciales (cuenta maestra, usuarios de prueba, inventario)
+npm run db:studio        # Abrir Prisma Studio (GUI de la BD)
+npm run db:reset          # Reset total de la BD + re-seed
 ```
 
 ---
 
-## Formato de Respuestas
+## Formato de respuestas
 
-Todas las respuestas siguen el mismo formato JSON:
+Todas las rutas siguen el mismo formato JSON:
 
 ```json
 {
@@ -318,24 +298,13 @@ Todas las respuestas siguen el mismo formato JSON:
 }
 ```
 
-En caso de error:
-```json
-{
-  "success": false,
-  "message": "Descripción del error"
-}
-```
-
 ---
 
 ## Créditos
 
-**Desarrollado por:** Diego  
-**Institución:** Escuela Industrial Álvaro Obregón (EIAO) — UANL  
-**Contexto:** Proyecto de Servicio Social  
-**Ciudad:** Monterrey, Nuevo León, México  
-**Año:** 2024
-
----
+**Desarrollado por:** Diego ([OgeidDev](https://www.linkedin.com/in/diegocabreraaguilar))
+**Institución:** Escuela Industrial Álvaro Obregón (EIAO) — UANL
+**Contexto:** Proyecto de Servicio Social
+**Ciudad:** Monterrey, Nuevo León, México
 
 *Este sistema fue desarrollado con fines educativos y de servicio social para modernizar la gestión interna de la EIAO UANL.*

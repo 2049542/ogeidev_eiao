@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 .env.production
+.env.*.local
 
 # Prisma: el cliente generado se puede regenerar
 node_modules/.prisma/

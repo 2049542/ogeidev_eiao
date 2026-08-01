@@ -6,6 +6,8 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "api/index.js" },
+    { "src": "/", "dest": "/public/proyecto.html" },
+    { "src": "/index.html", "dest": "/public/proyecto.html" },
     { "src": "/(.*)", "dest": "/public/$1" }
   ]
 }
