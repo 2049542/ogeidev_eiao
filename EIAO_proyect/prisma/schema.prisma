@@ -1,0 +1,370 @@
+// ============================================================
+// schema.prisma — Definición completa de la base de datos
+// para el sistema de gestión interna EIAO UANL.
+//
+// Aquí se definen todos los modelos (tablas), sus campos,
+// relaciones y enumeraciones. Prisma los convierte en SQL
+// real en PostgreSQL (Supabase).
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── ENUMERACIONES ────────────────────────────────────────────
+
+// Roles del sistema — cada rol tiene acceso a módulos distintos
+enum Rol {
+  Administrador          // Acceso total.
+  Avisos                 // Solo publica en Avisos Generales
+  SoporteTecnico         // Gestiona tickets de CCTV y AV
+  Auditorio              // Gestiona reservaciones del auditorio
+  Mantenimiento          // Órdenes de trabajo e inventario
+  Tecnico                // Mantenimiento correctivo, Inventario y Centro de Ayuda
+  CentroDeAyuda          // Tickets de contraseñas y reportes
+  ServicioSocial         // Solo ve módulo de auditorio
+  DocenteAdministrativo  // Avisos, Centro de Ayuda, Seguridad/CCTV, Auditorio
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum StatusTicket {
+  Pendiente
+  Atendido
+  EnProceso
+  Resuelto
+  Cancelado
+}
+
+enum StatusReservacion {
+  PENDIENTE  // Recién creada, esperando aprobación del admin
+  APROBADA   // Admin la aprobó, aparece en el calendario
+  RECHAZADA  // Admin la rechazó
+}
+
+enum StatusGrabacion {
+  PENDIENTE
+  EN_PROCESO
+  COMPLETADA
+  RECHAZADA
+}
+
+enum StatusIncidente {
+  PENDIENTE
+  EN_REVISION
+  RESUELTO
+}
+
+enum StatusMantenimiento {
+  PENDIENTE
+  EN_PROGRESO
+  COMPLETADO
+  CANCELADO
+}
+
+// ── MODELOS PRINCIPALES ──────────────────────────────────────
+
+// Usuario del sistema — empleados, docentes, prestadores de SS
+model User {
+  id                   String    @id @default(cuid())
+  nombre               String
+  email                String    @unique
+  password             String
+  roles                Rol[]     @default([DocenteAdministrativo])
+  activo               Boolean   @default(false)
+  pendienteAprobacion  Boolean   @default(true)
+  rechazado            Boolean   @default(false) // Solicitud de registro rechazada por un admin
+  esCuentaMaestra      Boolean   @default(false)
+  areaSolicitada       String?   // Área/Departamento indicado por el usuario al registrarse (referencia para el admin al aprobar)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relaciones hacia otros modelos
+  ticketsCreados               Ticket[]                  @relation("TicketCreado")
+  ticketsAsignados             Ticket[]                  @relation("TicketAsignado")
+  ticketsAtendidos             Ticket[]                  @relation("TicketAtendido")
+  comentarios                  Comentario[]
+  reservacionesCreadas         Reservacion[]             @relation("ReservacionCreada")
+  reservacionesAprobadas       Reservacion[]             @relation("ReservacionAprobada")
+  becaPublicaciones            BecaPublicacion[]
+  avisoLikes                   AvisoLike[]
+  solicitudesGrabacion         SolicitudGrabacion[]
+  reportesIncidente            ReporteIncidente[]
+  mantenimientosCreados        MantenimientoCorrectivo[] @relation("MantenimientoCreado")
+  mantenimientosAsignados      MantenimientoCorrectivo[] @relation("MantenimientoAsignado")
+  historialMantenimientoAccion HistorialMantenimiento[]
+  solucionesRapidas            SolucionRapida[]
+
+  @@map("users")
+}
+
+// Ticket general del sistema (soporte técnico, incidencias, etc.)
+model Ticket {
+  id          String       @id @default(cuid())
+  titulo      String
+  descripcion String
+  area        String       // 'SoporteTecnico', 'CentroDeAyuda', etc.
+  tipo        String       // 'CCTV', 'AV', 'PASSWORD', 'REPORTE', etc.
+  prioridad   Prioridad    @default(MEDIA)
+  status      StatusTicket @default(Pendiente)
+  seguimiento String?      // Notas internas de seguimiento
+  slaHoras    Int?         // Tiempo de respuesta comprometido en horas
+  imagenUrl   String?      // Foto adjunta al reportar (Cloudinary)
+
+  userId    String
+  user      User    @relation("TicketCreado", fields: [userId], references: [id])
+  asignadoA String?
+  asignado  User?   @relation("TicketAsignado", fields: [asignadoA], references: [id])
+
+  // Quién marcó el ticket como "Atendido"
+  atendidoPorId String?
+  atendidoPor   User?     @relation("TicketAtendido", fields: [atendidoPorId], references: [id])
+  atendidoAt    DateTime?
+
+  // Respuesta de resolución (mensaje + evidencia) al cerrar el ticket
+  resolucionMensaje    String?
+  resolucionImagenUrl  String?
+  resolucionAt         DateTime?
+
+  comentarios Comentario[]
+  encuesta    EncuestaSatisfaccion?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+  deletedAt  DateTime?
+
+  @@map("tickets")
+}
+
+// Comentarios en tickets — historial de comunicación
+model Comentario {
+  id        String  @id @default(cuid())
+  texto     String
+  imagenUrl String? // Imagen adjunta opcional (Cloudinary)
+  ticketId  String
+  ticket    Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("comentarios")
+}
+
+// Encuesta de satisfacción — el usuario dueño del ticket la responde una vez resuelto
+model EncuestaSatisfaccion {
+  id           String   @id @default(cuid())
+  ticketId     String   @unique
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  calificacion Int
+  comentario   String?
+  createdAt    DateTime @default(now())
+
+  @@map("encuestas_satisfaccion")
+}
+
+// Reservación del auditorio — pendiente hasta aprobación del admin
+model Reservacion {
+  id         String            @id @default(cuid())
+  evento     String
+  fecha      DateTime
+  horaInicio String
+  horaFin    String
+  asistentes Int
+  equipo     String?           // Equipo AV requerido
+  notas      String?
+  status     StatusReservacion @default(PENDIENTE)
+
+  userId String
+  user   User   @relation("ReservacionCreada", fields: [userId], references: [id])
+
+  // Quién del equipo admin la aprobó/rechazó
+  aprobadoPor String?
+  aprobador   User?   @relation("ReservacionAprobada", fields: [aprobadoPor], references: [id])
+
+  motivoRechazo String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@map("reservaciones")
+}
+
+// Publicación de Avisos Generales — flyers e infografías (antes "Becas")
+model BecaPublicacion {
+  id                 String    @id @default(cuid())
+  titulo             String
+  descripcion        String
+  imageUrl           String    // URL pública de Cloudinary
+  publicCloudinaryId String    // ID interno de Cloudinary para poder borrarla
+  etiquetaArea       String    @default("Becas") // Auditorio, Difusión e Imagen, Soporte Técnico, Becas, Nexus, Centro de Ayuda, Seguridad
+  userId             String
+  user               User      @relation(fields: [userId], references: [id])
+  notificadoAt       DateTime?
+
+  likes AvisoLike[]
+
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@map("beca_publicaciones")
+}
+
+// "Me gusta" de un usuario en un aviso — un usuario solo puede dar like una vez por aviso
+model AvisoLike {
+  id      String          @id @default(cuid())
+  avisoId String
+  aviso   BecaPublicacion @relation(fields: [avisoId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User            @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([avisoId, userId])
+  @@map("aviso_likes")
+}
+
+// Solicitud de grabación del sistema CCTV
+model SolicitudGrabacion {
+  id          String          @id @default(cuid())
+  motivo      String
+  zona        String          // Zona o cámara específica
+  fecha       DateTime
+  horaInicio  String?
+  horaFin     String?
+  descripcion String?
+  personas    String?
+  urgencia    String          @default("Normal")
+  status      StatusGrabacion @default(PENDIENTE)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@map("solicitudes_grabacion")
+}
+
+// Reporte de incidente de seguridad
+model ReporteIncidente {
+  id          String          @id @default(cuid())
+  tipo        String          // 'ROBO', 'VANDALISMO', 'ACCIDENTE', 'OTRO'
+  fecha       DateTime
+  hora        String
+  lugar       String
+  descripcion String
+  contacto    String          @default("Sistema")
+  anonimo     Boolean         @default(false)
+  status      StatusIncidente @default(PENDIENTE)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@map("reportes_incidente")
+}
+
+// Inventario único de equipo de cómputo — registro detallado por equipo
+// (reemplaza el inventario simple de existencias por cantidad)
+model Inventario {
+  id                 String    @id @default(cuid())
+  departamento       String    // Departamento / Área
+  ubicacion          String?   // Ubicación específica
+  responsable        String?
+  tipoEquipo         String    // CPU, Monitor, Impresora, Laptop, Proyector, Escáner, Otro
+  noPatrimonio       String?
+  marca              String?
+  modelo             String?
+  noSerie            String?
+  procesador         String?
+  ram                String?
+  tipoRam            String?   // DDR2, DDR3, DDR4, DDR5
+  almacenamiento     String?
+  tipoAlmacenamiento String?   // HDD, SSD
+  estado             String    @default("Bueno") // Bueno, Regular, Dañado, Baja / Fuera de servicio
+  fechaRegistro      DateTime  @default(now())
+  observaciones      String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("inventario")
+}
+
+// Orden de mantenimiento correctivo — con historial de estados
+model MantenimientoCorrectivo {
+  id          String              @id @default(cuid())
+  titulo      String
+  descripcion String
+  ubicacion   String
+  prioridad   Prioridad           @default(MEDIA)
+  status      StatusMantenimiento @default(PENDIENTE)
+
+  userId String
+  user   User   @relation("MantenimientoCreado", fields: [userId], references: [id])
+
+  tecnicoId String?
+  tecnico   User?   @relation("MantenimientoAsignado", fields: [tecnicoId], references: [id])
+
+  historial HistorialMantenimiento[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+  deletedAt  DateTime?
+
+  @@map("mantenimiento_correctivo")
+}
+
+// Historial de cambios de estado en órdenes de mantenimiento
+model HistorialMantenimiento {
+  id              String              @id @default(cuid())
+  mantenimientoId String
+  mantenimiento   MantenimientoCorrectivo @relation(fields: [mantenimientoId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  statusAnterior StatusMantenimiento
+  statusNuevo    StatusMantenimiento
+  comentario     String?
+
+  createdAt DateTime @default(now())
+
+  @@map("historial_mantenimiento")
+}
+
+// Base de conocimiento de autoservicio — problemas técnicos recurrentes
+// y su solución, sin categorías. Consultada por docentes y técnicos
+// antes de levantar un ticket.
+model SolucionRapida {
+  id        String    @id @default(cuid())
+  problema  String
+  solucion  String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("soluciones_rapidas")
+}
