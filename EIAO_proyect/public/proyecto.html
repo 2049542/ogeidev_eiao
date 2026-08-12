@@ -2523,10 +2523,12 @@ function sc(){
 ══════════════════════════════════════════════════════════ -->
 <script>
 /* ── CONFIG ─────────────────────────────────────────────── */
-// Auto-detección de URL de API: localhost/127.0.0.1 en desarrollo, Render en producción
-const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:3000/api'
-  : 'https://PLACEHOLDER-BACKEND.onrender.com/api'; // Reemplazar con la URL real de Render al desplegar el backend
+// URL relativa: el mismo proceso (Express en local, la función serverless
+// en Vercel) sirve tanto este HTML como /api/*, así que el navegador la
+// resuelve automáticamente contra el origen actual. No hay dominio
+// hardcodeado que mantener sincronizado — funciona igual en localhost,
+// en cualquier preview de Vercel y en producción.
+const API_URL = '/api';
 
 let TOKEN = localStorage.getItem('eiao_token');
 
