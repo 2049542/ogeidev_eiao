@@ -36,7 +36,7 @@ function normalizarTipoEquipo(tipo) {
 // TIPO_EQUIPO,PATR_CI,MODELO,DESCRIPCION,SERIE,OBSERVACION) y lo
 // convierte en filas listas para Inventario.createMany.
 function cargarEquiposDesdeCSV() {
-  const csvPath = path.join(__dirname, '../../inventario_sala_computo_1.csv');
+  const csvPath = path.join(__dirname, 'inventario_sala_computo_1.csv');
   if (!fs.existsSync(csvPath)) {
     console.log('⏩ No se encontró inventario_sala_computo_1.csv, se omite la carga de inventario.\n');
     return [];

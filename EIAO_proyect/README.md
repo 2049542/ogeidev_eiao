@@ -6,6 +6,10 @@
 
 ---
 
+> 🎓 **¿Vas a evaluar/correr el proyecto en local por primera vez?** Ve directo a [`SETUP_PARA_TUTOR.md`](./SETUP_PARA_TUTOR.md) — guía paso a paso con cada variable de entorno explicada y de dónde sacarla.
+
+---
+
 ## Descripción
 
 Este sistema centraliza la gestión interna de la EIAO en módulos especializados por área:

@@ -985,13 +985,6 @@ select option{background:var(--bg-2)!important;color:var(--text-1)!important;}
         </div>
       </div>
       <button class="btn-main" onclick="doLogin()">Iniciar sesión →</button>
-      <div class="auth-divider"><span></span><p>acceso rápido demo</p><span></span></div>
-      <div class="demo-pills">
-        <button class="dp" onclick="fd('admin@eiao.mx','Admin.EIAO.2026')">Administrador</button>
-        <button class="dp" onclick="fd('avisos@uanl.edu.mx','Test.2026!')">Avisos</button>
-        <button class="dp" onclick="fd('prestador@uanl.edu.mx','Test.2026!')">Servicio Social</button>
-        <button class="dp" onclick="fd('maestro@uanl.edu.mx','Test.2026!')">Docente/Administrativo</button>
-      </div>
     </div>
 
     <!-- REGISTER FORM -->
@@ -1841,8 +1834,6 @@ const toast = (msg, ok=true) => Toastify({
 /* ══════════════════════════════════════
    AUTH
 ══════════════════════════════════════ */
-function fd(e,p){document.getElementById('l-email').value=e;document.getElementById('l-pass').value=p;}
-
 function switchTab(tab){
   document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('on', (i===0&&tab==='login')||(i===1&&tab==='register')));
   document.getElementById('form-login').style.display = tab==='login' ? 'block' : 'none';
